@@ -13,6 +13,8 @@ subnet and private DNS zone are included because PostgreSQL Flexible Server
 private networking requires them.
 The Compute Gallery remains private to this subscription; cross-subscription
 and community sharing are not enabled.
+PostgreSQL uses the Central India Burstable `Standard_B2s` SKU because the
+region rejected `Standard_B1ms` during provisioning.
 
 The PostgreSQL password is read from the environment, not stored in the
 parameter file. In PowerShell, set it for the current process and deploy:
@@ -26,3 +28,13 @@ Remove-Item Env:LABFORGE_POSTGRES_ADMIN_PASSWORD
 `infra/main.bicepparam` is ignored by Git. It uses
 `readEnvironmentVariable('LABFORGE_POSTGRES_ADMIN_PASSWORD')`; create the file
 from `main.bicepparam.example` before deployment.
+
+If the core resources already exist and only PostgreSQL needs retrying, use
+`postgresql.bicep` at resource-group scope so the retry does not redeploy the
+network or Container Apps environment:
+
+```powershell
+az deployment group validate --resource-group rg-labforge-core --template-file infra/postgresql.bicep --parameters postgresAdminPassword=$env:LABFORGE_POSTGRES_ADMIN_PASSWORD
+az deployment group what-if --name labforge-postgresql-preview --resource-group rg-labforge-core --template-file infra/postgresql.bicep --parameters postgresAdminPassword=$env:LABFORGE_POSTGRES_ADMIN_PASSWORD
+az deployment group create --name labforge-postgresql --resource-group rg-labforge-core --template-file infra/postgresql.bicep --parameters postgresAdminPassword=$env:LABFORGE_POSTGRES_ADMIN_PASSWORD
+```

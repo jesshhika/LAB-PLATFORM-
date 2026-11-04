@@ -157,7 +157,7 @@ resource postgresql 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   name: 'psql-labforge-${uniqueString(resourceGroup().id)}'
   location: location
   sku: {
-    name: 'Standard_B1ms'
+    name: 'Standard_B2s'
     tier: 'Burstable'
   }
   properties: {
