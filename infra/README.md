@@ -13,8 +13,9 @@ subnet and private DNS zone are included because PostgreSQL Flexible Server
 private networking requires them.
 The Compute Gallery remains private to this subscription; cross-subscription
 and community sharing are not enabled.
-PostgreSQL uses the Central India Burstable `Standard_B2s` SKU because the
-region rejected `Standard_B1ms` during provisioning.
+PostgreSQL uses `Standard_D2s_v3` (General Purpose) in Central India because
+Azure rejected the Burstable `Standard_B1ms` and `Standard_B2s` SKUs during
+provisioning.
 
 The PostgreSQL password is read from the environment, not stored in the
 parameter file. In PowerShell, set it for the current process and deploy:
