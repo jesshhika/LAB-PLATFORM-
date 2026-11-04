@@ -1,0 +1,104 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-labforge}
+      POSTGRES_USER: ${POSTGRES_USER:-labforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labforge} -d ${POSTGRES_DB:-labforge}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  guacd:
+    image: guacamole/guacd:1.5.5
+    expose:
+      - "4822"
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labforge:local-dev-password@postgres:5432/labforge}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      APP_ENV: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/workspace/api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  worker:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    command: ["python", "-m", "worker"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labforge:local-dev-password@postgres:5432/labforge}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      APP_ENV: development
+    volumes:
+      - ./api:/workspace/api
+      - ./worker:/workspace/worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/app
+      - web-node-modules:/app/node_modules
+      - web-next:/app/.next
+    depends_on:
+      api:
+        condition: service_healthy
+
+  guac-proxy:
+    build:
+      context: ./guac-proxy
+      dockerfile: Dockerfile
+    environment:
+      PORT: 8080
+      GUACD_HOST: ${GUACD_HOST:-guacd}
+      GUACD_PORT: 4822
+      GUAC_CRYPT_KEY: ${GUAC_CRYPT_KEY:-0123456789abcdef0123456789abcdef}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - guacd
+
+volumes:
+  postgres-data:
+  web-node-modules:
+  web-next:

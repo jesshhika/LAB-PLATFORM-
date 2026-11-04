@@ -1,0 +1,13 @@
+{
+  "name": "labforge-guac-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "lint": "node --check src/server.js"
+  },
+  "dependencies": {
+    "guacamole-lite": "1.2.0"
+  }
+}

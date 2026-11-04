@@ -1,0 +1,26 @@
+# Azure foundations
+
+These Bicep templates create the LabForge core and lab-VM resource groups,
+network, Key Vault, Log Analytics workspace, Container Apps environment,
+private PostgreSQL Flexible Server, Compute Gallery, and backend managed
+identity/role assignments.
+
+**Review and estimate costs before deployment.** The templates are not applied
+by the local Docker workflow. Use a dedicated lab subscription, confirm the
+region and quotas, and have an administrator review the identity permissions.
+The app subnet is delegated to Container Apps. A separate delegated database
+subnet and private DNS zone are included because PostgreSQL Flexible Server
+private networking requires them.
+
+The PostgreSQL password is read from the environment, not stored in the
+parameter file. In PowerShell, set it for the current process and deploy:
+
+```powershell
+$env:LABFORGE_POSTGRES_ADMIN_PASSWORD = [System.Net.NetworkCredential]::new('', (Read-Host -AsSecureString "PostgreSQL admin password")).Password
+az deployment sub create --location centralindia --template-file infra/main.bicep --parameters infra/main.bicepparam
+Remove-Item Env:LABFORGE_POSTGRES_ADMIN_PASSWORD
+```
+
+`infra/main.bicepparam` is ignored by Git. It uses
+`readEnvironmentVariable('LABFORGE_POSTGRES_ADMIN_PASSWORD')`; create the file
+from `main.bicepparam.example` before deployment.
