@@ -15,7 +15,9 @@ The Compute Gallery remains private to this subscription; cross-subscription
 and community sharing are not enabled.
 PostgreSQL uses `Standard_D2s_v3` (General Purpose) in Central India because
 Azure rejected the Burstable `Standard_B1ms` and `Standard_B2s` SKUs during
-provisioning.
+provisioning. The templates explicitly retain system-managed data encryption
+and the primary replication role so future What-If previews do not propose
+removing those server defaults.
 
 The PostgreSQL password is read from the environment, not stored in the
 parameter file. In PowerShell, set it for the current process and deploy:

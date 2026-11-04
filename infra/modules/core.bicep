@@ -164,6 +164,10 @@ resource postgresql 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
     version: '16'
     administratorLogin: postgresAdminUsername
     administratorLoginPassword: postgresAdminPassword
+    dataEncryption: {
+      type: 'SystemManaged'
+    }
+    replicationRole: 'Primary'
     storage: {
       storageSizeGB: 32
     }
