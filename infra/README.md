@@ -11,6 +11,8 @@ region and quotas, and have an administrator review the identity permissions.
 The app subnet is delegated to Container Apps. A separate delegated database
 subnet and private DNS zone are included because PostgreSQL Flexible Server
 private networking requires them.
+The Compute Gallery remains private to this subscription; cross-subscription
+and community sharing are not enabled.
 
 The PostgreSQL password is read from the environment, not stored in the
 parameter file. In PowerShell, set it for the current process and deploy:

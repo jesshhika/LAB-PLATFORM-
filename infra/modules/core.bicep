@@ -77,6 +77,9 @@ resource appsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
 resource databaseSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vnet
   name: 'snet-db'
+  dependsOn: [
+    appsSubnet
+  ]
   properties: {
     addressPrefix: '10.50.2.0/24'
     delegations: [
@@ -93,6 +96,9 @@ resource databaseSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' =
 resource labVmsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
   parent: vnet
   name: 'snet-labvms'
+  dependsOn: [
+    databaseSubnet
+  ]
   properties: {
     addressPrefix: '10.50.16.0/20'
     networkSecurityGroup: {
@@ -205,9 +211,6 @@ resource gallery 'Microsoft.Compute/galleries@2022-03-03' = {
   location: location
   properties: {
     description: 'LabForge reusable course images'
-    sharingProfile: {
-      permissions: 'Groups'
-    }
   }
 }
 
