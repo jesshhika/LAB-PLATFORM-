@@ -49,8 +49,8 @@ jobs:
         working-directory: web
       - run: npm ci && npm test
         working-directory: guac-proxy
-      - uses: azure/bicep-install@v1
-      - run: bicep build infra/main.bicep
+      - run: az bicep install
+      - run: az bicep build --file infra/main.bicep
 
   publish-staging-images:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
