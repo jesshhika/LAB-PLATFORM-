@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type HealthResponse = {
   status: string;
   service: string;
@@ -25,7 +27,7 @@ export default async function Home() {
   }
 
   return (
-    <main>
+    <main className="mx-auto my-[10vh] max-w-[720px] p-8">
       <p className="text-sm font-semibold uppercase tracking-widest text-blue-700">
         LabForge
       </p>
@@ -36,6 +38,12 @@ export default async function Home() {
       <p className="status mt-8" role="status" aria-live="polite">
         {health?.status === "healthy" ? "API healthy" : "API unavailable"}
       </p>
+      <Link
+        className="mt-6 inline-flex rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800"
+        href="/courses/foundry"
+      >
+        Open Microsoft Foundry Bootcamp
+      </Link>
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
     </main>
   );

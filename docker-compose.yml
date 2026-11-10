@@ -34,10 +34,27 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labforge:local-dev-password@postgres:5432/labforge}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       APP_ENV: development
+      DEV_USER_ID: ${DEV_USER_ID:-local-learner}
+      LABS_DIR: /workspace/labs
+      KEY_VAULT_URL: ${KEY_VAULT_URL:-}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-}
+      AZURE_LABS_TENANT_ID: ${AZURE_LABS_TENANT_ID:-}
+      AZURE_LABS_TENANT_DOMAIN: ${AZURE_LABS_TENANT_DOMAIN:-}
+      AZURE_SANDBOX_SUBSCRIPTION_ID: ${AZURE_SANDBOX_SUBSCRIPTION_ID:-}
+      GUAC_CRYPT_KEY: ${GUAC_CRYPT_KEY:?Set GUAC_CRYPT_KEY to a generated 32-byte key}
+      GUAC_WS_URL: ${GUAC_WS_URL:-ws://localhost:8080/}
+      AZURE_SUBSCRIPTION_ID: ${AZURE_SUBSCRIPTION_ID:-}
+      AZURE_RESOURCE_GROUP: ${AZURE_RESOURCE_GROUP:-rg-labforge-labvms}
+      AZURE_LAB_SUBNET_ID: ${AZURE_LAB_SUBNET_ID:-}
+      AZURE_GALLERY_IMAGE_ID: ${AZURE_GALLERY_IMAGE_ID:-}
+      AZURE_LAB_VM_SIZE: ${AZURE_LAB_VM_SIZE:-Standard_B2s}
     ports:
       - "8000:8000"
     volumes:
       - ./api:/workspace/api
+      - ./labs:/workspace/labs:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,6 +75,15 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labforge:local-dev-password@postgres:5432/labforge}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       APP_ENV: development
+      AZURE_SUBSCRIPTION_ID: ${AZURE_SUBSCRIPTION_ID:-}
+      AZURE_RESOURCE_GROUP: ${AZURE_RESOURCE_GROUP:-rg-labforge-labvms}
+      AZURE_LAB_SUBNET_ID: ${AZURE_LAB_SUBNET_ID:-}
+      AZURE_GALLERY_IMAGE_ID: ${AZURE_GALLERY_IMAGE_ID:-}
+      AZURE_LAB_VM_SIZE: ${AZURE_LAB_VM_SIZE:-Standard_B2s}
+      KEY_VAULT_URL: ${KEY_VAULT_URL:-}
+      AZURE_LABS_TENANT_ID: ${AZURE_LABS_TENANT_ID:-}
+      AZURE_LABS_TENANT_DOMAIN: ${AZURE_LABS_TENANT_DOMAIN:-}
+      AZURE_SANDBOX_SUBSCRIPTION_ID: ${AZURE_SANDBOX_SUBSCRIPTION_ID:-}
     volumes:
       - ./api:/workspace/api
       - ./worker:/workspace/worker
@@ -74,6 +100,8 @@ services:
     environment:
       API_INTERNAL_URL: http://api:8000
       WATCHPACK_POLLING: "true"
+      APP_ENV: development
+      DEV_USER_ID: ${DEV_USER_ID:-local-learner}
     ports:
       - "3000:3000"
     volumes:
@@ -92,7 +120,7 @@ services:
       PORT: 8080
       GUACD_HOST: ${GUACD_HOST:-guacd}
       GUACD_PORT: 4822
-      GUAC_CRYPT_KEY: ${GUAC_CRYPT_KEY:-0123456789abcdef0123456789abcdef}
+      GUAC_CRYPT_KEY: ${GUAC_CRYPT_KEY:?Set GUAC_CRYPT_KEY to a generated 32-byte key}
     ports:
       - "8080:8080"
     depends_on:

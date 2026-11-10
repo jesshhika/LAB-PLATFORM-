@@ -2,3 +2,12 @@ using './main.bicep'
 
 param postgresAdminUsername = 'labforgeadmin'
 param postgresAdminPassword = readEnvironmentVariable('LABFORGE_POSTGRES_ADMIN_PASSWORD')
+param postgresSkuName = 'Standard_B1ms'
+param postgresSkuTier = 'Burstable'
+param postgresStorageSizeGB = 32
+param monthlyBudgetAmount = 2500
+// Replace the placeholder with a monitored billing address before deployment.
+param budgetContactEmails = ['replace-with-monitored-address@example.com']
+// Replace with the staging GitHub OIDC service principal object ID before deployment.
+param postgresSchedulerPrincipalId = '00000000-0000-0000-0000-000000000000'
+param logAnalyticsDailyQuotaGb = 1

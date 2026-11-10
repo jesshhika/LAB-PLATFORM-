@@ -7,6 +7,10 @@ param postgresAdminUsername string = 'labforgeadmin'
 @description('Set through LABFORGE_POSTGRES_ADMIN_PASSWORD.')
 param postgresAdminPassword string
 
+param postgresSkuName string = 'Standard_B1ms'
+param postgresSkuTier string = 'Burstable'
+param postgresStorageSizeGB int = 32
+
 var location = resourceGroup().location
 
 resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' existing = {
@@ -26,8 +30,8 @@ resource postgresql 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   name: 'psql-labforge-${uniqueString(resourceGroup().id)}'
   location: location
   sku: {
-    name: 'Standard_D2s_v3'
-    tier: 'GeneralPurpose'
+    name: postgresSkuName
+    tier: postgresSkuTier
   }
   properties: {
     version: '16'
@@ -38,7 +42,7 @@ resource postgresql 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
     }
     replicationRole: 'Primary'
     storage: {
-      storageSizeGB: 32
+      storageSizeGB: postgresStorageSizeGB
     }
     backup: {
       backupRetentionDays: 7

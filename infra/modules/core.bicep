@@ -4,8 +4,16 @@ param location string
 param postgresAdminUsername string
 @secure()
 param postgresAdminPassword string
+param postgresSkuName string = 'Standard_B1ms'
+param postgresSkuTier string = 'Burstable'
+param postgresStorageSizeGB int = 32
+param logAnalyticsDailyQuotaGb int = 1
+param postgresSchedulerPrincipalId string
 
 var vnetName = 'vnet-labforge'
+var appsSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, 'snet-apps')
+var databaseSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, 'snet-db')
+var labVmsSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, 'snet-labvms')
 var keyVaultName = 'kv-lf-${uniqueString(resourceGroup().id)}'
 var galleryName = 'galLabForge'
 var identityName = 'id-labforge-api'
@@ -55,55 +63,53 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
         '10.50.0.0/16'
       ]
     }
-  }
-}
-
-resource appsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
-  parent: vnet
-  name: 'snet-apps'
-  properties: {
-    addressPrefix: '10.50.1.0/24'
-    delegations: [
+    subnets: [
       {
-        name: 'containerApps'
+        name: 'snet-apps'
         properties: {
-          serviceName: 'Microsoft.App/environments'
+          addressPrefix: '10.50.1.0/24'
+          privateEndpointNetworkPolicies: 'Disabled'
+          delegations: [
+            {
+              name: 'containerApps'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
+        }
+      }
+      {
+        name: 'snet-db'
+        properties: {
+          addressPrefix: '10.50.2.0/24'
+          privateEndpointNetworkPolicies: 'Disabled'
+          delegations: [
+            {
+              name: 'postgresFlexibleServer'
+              properties: {
+                serviceName: 'Microsoft.DBforPostgreSQL/flexibleServers'
+              }
+            }
+          ]
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.Storage'
+            }
+          ]
+        }
+      }
+      {
+        name: 'snet-labvms'
+        properties: {
+          addressPrefix: '10.50.16.0/20'
+          privateEndpointNetworkPolicies: 'Disabled'
+          networkSecurityGroup: {
+            id: labNsg.id
+          }
         }
       }
     ]
-  }
-}
-
-resource databaseSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
-  parent: vnet
-  name: 'snet-db'
-  dependsOn: [
-    appsSubnet
-  ]
-  properties: {
-    addressPrefix: '10.50.2.0/24'
-    delegations: [
-      {
-        name: 'postgresFlexibleServer'
-        properties: {
-          serviceName: 'Microsoft.DBforPostgreSQL/flexibleServers'
-        }
-      }
-    ]
-  }
-}
-
-resource labVmsSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' = {
-  parent: vnet
-  name: 'snet-labvms'
-  dependsOn: [
-    databaseSubnet
-  ]
-  properties: {
-    addressPrefix: '10.50.16.0/20'
-    networkSecurityGroup: {
-      id: labNsg.id
-    }
   }
 }
 
@@ -115,6 +121,9 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
       name: 'PerGB2018'
     }
     retentionInDays: 30
+    workspaceCapping: {
+      dailyQuotaGb: logAnalyticsDailyQuotaGb
+    }
   }
 }
 
@@ -156,9 +165,13 @@ resource postgresqlDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLink
 resource postgresql 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   name: 'psql-labforge-${uniqueString(resourceGroup().id)}'
   location: location
+  tags: {
+    labforge: 'true'
+    environment: 'staging'
+  }
   sku: {
-    name: 'Standard_D2s_v3'
-    tier: 'GeneralPurpose'
+    name: postgresSkuName
+    tier: postgresSkuTier
   }
   properties: {
     version: '16'
@@ -169,14 +182,14 @@ resource postgresql 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
     }
     replicationRole: 'Primary'
     storage: {
-      storageSizeGB: 32
+      storageSizeGB: postgresStorageSizeGB
     }
     backup: {
       backupRetentionDays: 7
       geoRedundantBackup: 'Disabled'
     }
     network: {
-      delegatedSubnetResourceId: databaseSubnet.id
+      delegatedSubnetResourceId: databaseSubnetId
       privateDnsZoneArmResourceId: postgresqlDnsZone.id
     }
     highAvailability: {
@@ -192,24 +205,6 @@ resource postgresql 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   ]
 }
 
-resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
-  name: 'cae-labforge'
-  location: location
-  properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: logAnalytics.properties.customerId
-        sharedKey: logAnalytics.listKeys().primarySharedKey
-      }
-    }
-    vnetConfiguration: {
-      infrastructureSubnetId: appsSubnet.id
-      internal: false
-    }
-  }
-}
-
 resource gallery 'Microsoft.Compute/galleries@2022-03-03' = {
   name: galleryName
   location: location
@@ -221,6 +216,38 @@ resource gallery 'Microsoft.Compute/galleries@2022-03-03' = {
 resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: identityName
   location: location
+}
+
+resource postgresScheduleRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(resourceGroup().id, 'LabForge PostgreSQL Power Scheduler')
+  properties: {
+    roleName: 'LabForge PostgreSQL Power Scheduler'
+    description: 'Allows the staging schedule workflow to read, start, and stop PostgreSQL Flexible Servers in the LabForge core resource group.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.DBforPostgreSQL/flexibleServers/read'
+          'Microsoft.DBforPostgreSQL/flexibleServers/start/action'
+          'Microsoft.DBforPostgreSQL/flexibleServers/stop/action'
+        ]
+        notActions: []
+      }
+    ]
+    assignableScopes: [
+      resourceGroup().id
+    ]
+  }
+}
+
+resource postgresScheduleRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, postgresSchedulerPrincipalId, postgresScheduleRole.id)
+  scope: postgresql
+  properties: {
+    roleDefinitionId: postgresScheduleRole.id
+    principalId: postgresSchedulerPrincipalId
+    principalType: 'ServicePrincipal'
+  }
 }
 
 resource galleryReaderAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -243,12 +270,13 @@ resource keyVaultSecretsOfficerAssignment 'Microsoft.Authorization/roleAssignmen
   }
 }
 
-output appsSubnetId string = appsSubnet.id
-output labVmsSubnetId string = labVmsSubnet.id
-output databaseSubnetId string = databaseSubnet.id
+output appsSubnetId string = appsSubnetId
+output labVmsSubnetId string = labVmsSubnetId
+output databaseSubnetId string = databaseSubnetId
 output galleryName string = gallery.name
 output galleryId string = gallery.id
 output apiPrincipalId string = apiIdentity.properties.principalId
 output apiIdentityClientId string = apiIdentity.properties.clientId
 output keyVaultUri string = keyVault.properties.vaultUri
 output keyVaultId string = keyVault.id
+output postgresServerName string = postgresql.name

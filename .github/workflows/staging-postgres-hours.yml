@@ -1,0 +1,86 @@
+name: Staging PostgreSQL hours
+
+on:
+  schedule:
+    - cron: '30 16 * * *'
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: PostgreSQL action
+        required: true
+        type: choice
+        options:
+          - start
+          - stop
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: labforge-staging-postgres-hours
+  cancel-in-progress: false
+
+jobs:
+  manage-postgres:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Resolve requested power state
+        id: operation
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          MANUAL_ACTION: ${{ inputs.action }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+            case "$SCHEDULE" in
+              '30 16 * * *') action=stop ;;
+              '30 2 * * *') action=start ;;
+              *) echo "Unexpected schedule: $SCHEDULE" >&2; exit 1 ;;
+            esac
+          else
+            action="$MANUAL_ACTION"
+          fi
+          if [[ "$action" != start && "$action" != stop ]]; then
+            echo "Action must be start or stop." >&2
+            exit 1
+          fi
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+
+      - name: Sign in with workload identity federation
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start or stop the staging server
+        env:
+          ACTION: ${{ steps.operation.outputs.action }}
+          SERVER_NAME: ${{ vars.AZURE_POSTGRES_SERVER_NAME }}
+        shell: bash
+        run: |
+          resource_group=rg-labforge-core
+          if [[ ! "$SERVER_NAME" =~ ^psql-labforge-[a-z0-9]+$ ]]; then
+            echo "Set AZURE_POSTGRES_SERVER_NAME to the deployed LabForge server name." >&2
+            exit 1
+          fi
+
+          state="$(az postgres flexible-server show \
+            --resource-group "$resource_group" \
+            --name "$SERVER_NAME" \
+            --query state -o tsv)"
+
+          if [[ "$ACTION" == start && "$state" == Ready ]]; then
+            echo "PostgreSQL is already running."
+            exit 0
+          fi
+          if [[ "$ACTION" == stop && "$state" == Stopped ]]; then
+            echo "PostgreSQL is already stopped."
+            exit 0
+          fi
+          az postgres flexible-server "$ACTION" \
+            --resource-group "$resource_group" \
+            --name "$SERVER_NAME"

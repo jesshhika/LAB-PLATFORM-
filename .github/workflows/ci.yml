@@ -1,0 +1,86 @@
+name: CI and deployment
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: labforge_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d labforge_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:test-password@localhost:5432/labforge_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r api/requirements.txt
+      - run: ruff check --select E4,E7,E9,F,I api worker
+      - run: pytest -q api/tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run lint
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - run: npm ci && npm test
+        working-directory: guac-proxy
+      - uses: azure/bicep-install@v1
+      - run: bicep build infra/main.bicep
+
+  deploy-staging:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - run: az acr login --name labforgeregistry
+      - run: |
+          docker build -t labforgeregistry.azurecr.io/labforge-api:${{ github.sha }} -f api/Dockerfile .
+          docker build -t labforgeregistry.azurecr.io/labforge-web:${{ github.sha }} -f web/Dockerfile ./web
+          docker build -t labforgeregistry.azurecr.io/labforge-guac:${{ github.sha }} -f guac-proxy/Dockerfile ./guac-proxy
+          docker push labforgeregistry.azurecr.io/labforge-api:${{ github.sha }}
+          docker push labforgeregistry.azurecr.io/labforge-web:${{ github.sha }}
+          docker push labforgeregistry.azurecr.io/labforge-guac:${{ github.sha }}
+
+  deploy-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "Production deployment requires an approved release after staging verification."

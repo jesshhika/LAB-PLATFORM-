@@ -18,12 +18,6 @@ body {
   min-height: 100vh;
 }
 
-main {
-  margin: 10vh auto;
-  max-width: 720px;
-  padding: 2rem;
-}
-
 .status {
   display: inline-flex;
   align-items: center;

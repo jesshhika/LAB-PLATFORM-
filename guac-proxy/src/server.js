@@ -1,4 +1,5 @@
 const GuacamoleLite = require("guacamole-lite");
+const { createCallbacks } = require("./callbacks");
 
 const port = Number.parseInt(process.env.PORT ?? "8080", 10);
 const guacdHost = process.env.GUACD_HOST ?? "localhost";
@@ -24,4 +25,5 @@ new GuacamoleLite(
       key: cryptKey,
     },
   },
+  createCallbacks(),
 );

@@ -1,0 +1,47 @@
+id: foundry
+title: Microsoft Foundry Bootcamp
+description: Hands-on Microsoft Foundry labs using the LabForge Windows workspace.
+image:
+  definition: img-foundry
+  version: 1.0.4
+session_minutes: 180
+max_extensions: 1
+vm_size: Standard_B2s
+idle_timeout_minutes: 30
+warm_pool_size: 0
+labs:
+  - id: foundry-lab-01
+    number: 1
+    title: Prepare your Foundry development environment
+    guide: lab-01.md
+    validation:
+      type: vm
+      script: validate/lab-01.ps1
+  - id: foundry-lab-02
+    number: 2
+    title: Explore models in Foundry Toolkit
+    guide: lab-02.md
+    validation:
+      type: vm
+      script: validate/lab-02.ps1
+  - id: foundry-lab-03
+    number: 3
+    title: Build your first Foundry agent
+    guide: lab-03.md
+    validation:
+      type: vm
+      script: validate/lab-03.ps1
+  - id: foundry-lab-04
+    number: 4
+    title: Add tools to an agent
+    guide: lab-04.md
+    validation:
+      type: vm
+      script: validate/lab-04.ps1
+  - id: foundry-lab-05
+    number: 5
+    title: Test and evaluate an agent
+    guide: lab-05.md
+    validation:
+      type: vm
+      script: validate/lab-05.ps1
