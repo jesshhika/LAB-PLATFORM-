@@ -3,8 +3,8 @@
 This runbook describes a controlled staging deployment and temporary VM
 acceptance test. The user authorized a maximum of **INR 3,000 total incremental
 spend** for staging and one temporary VM acceptance test. This is an operator
-stop limit, not an Azure-enforced cap. No deployment or billable acceptance VM
-has been performed.
+stop limit, not an Azure-enforced cap. The Basic container registry has been
+deployed; application deployment and the billable acceptance VM have not.
 
 ## Guardrails in this change
 
@@ -28,6 +28,11 @@ has been performed.
   and is not a hard spend cap.
 - The Bicep template sets Log Analytics ingestion to 1 GiB/day and retention
   to 30 days. It is not deployed.
+- The staging CI job publishes images only; it does not deploy the application
+  runtime. The Basic registry `labforgeregistry` is deployed in
+  `rg-labforge-core`, with registry-scoped `AcrPush` for the GitHub staging
+  identity. Basic ACR uses a public-network endpoint with authenticated private
+  repositories; it is not private-link isolated.
 
 ## Preflight
 
@@ -51,22 +56,27 @@ has been performed.
    - Variable: `AZURE_POSTGRES_SERVER_NAME`, copied from the Bicep deployment
      output.
    - An OIDC federated credential limited to this repository and environment.
-6. Review the current worktree and Bicep what-if output. The 10 November
+6. Completed: reviewed the registry what-if and deployed
+   `infra/registry.bicep`. Verified `labforgeregistry.azurecr.io` uses Basic,
+   has the admin account disabled, and grants the GitHub staging principal
+   only registry-scoped `AcrPush`. Set `AZURE_ACR_NAME=labforgeregistry` in the
+   GitHub `staging` environment before the image-publishing workflow runs.
+7. Review the current worktree and Bicep what-if output. The 10 November
    what-if showed new budget, policies, policy assignments, a custom role, and
    role assignments; it also showed changes to the existing gallery description,
    PostgreSQL tags, Log Analytics daily quota (0.023 to 1 GiB/day), and a
    Key Vault role assignment. It used dummy what-if values and is not deployment
    approval. Review those changes and the actual identities/recipients again
    before any deployment.
-7. The current Bicep entry point provisions foundations and governance only;
+8. The current Bicep entry point provisions foundations and governance only;
    it does not deploy the LabForge API, web app, worker, Redis, or Guacamole
    services. Do not treat this infrastructure what-if as an application
    staging deployment.
-8. Azure MCP resource-group inventory succeeds for the target subscription,
+9. Azure MCP resource-group inventory succeeds for the target subscription,
    but its PostgreSQL command returns a 401 tenant-mismatch error. Resolve the
    MCP/CLI credential tenant before using that path for PostgreSQL operations;
    do not infer server state from the failed request.
-9. Apply the API migrations before starting the application. Do not run
+10. Apply the API migrations before starting the application. Do not run
    acceptance against a database without the staging guardrail migration.
 
 ## Acceptance sequence
@@ -107,9 +117,9 @@ has been performed.
 ## Current status
 
 The application controls, reaper, Bicep guardrails, and scheduled PostgreSQL
-workflow are code changes only. Azure read-only inventory and a Bicep what-if
-were performed, but no Azure resource deployment, budget assignment, workflow
-run, or billable acceptance VM has been performed. The Azure MCP PostgreSQL
-operation remains blocked by a credential tenant mismatch; resource inventory
-and Azure CLI read-only checks are available, but this does not authorize or
-validate a deployment.
+workflow are code changes. The Basic ACR was deployed after a successful
+what-if; the budget assignment and application runtime are not deployed, and no
+workflow run or billable acceptance VM has been performed. Configure the
+`AZURE_ACR_NAME` staging environment variable before image publishing. The
+Azure MCP PostgreSQL operation remains blocked by a credential tenant
+mismatch; Azure CLI read-only checks are available.

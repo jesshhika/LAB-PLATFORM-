@@ -39,12 +39,34 @@ also creates private-only NICs. The PostgreSQL schedule workflow stops the
 server at 10:00 PM IST and starts it at 8:00 AM IST; it does not stop storage
 charges. Configure the repository's `staging` environment with the OIDC
 secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID`, and
-the variable `AZURE_POSTGRES_SERVER_NAME`. Pass the OIDC principal object ID as
-`postgresSchedulerPrincipalId` to grant only server read/start/stop actions.
-The schedule can be manually dispatched to start or stop the server.
+the variables `AZURE_POSTGRES_SERVER_NAME` and `AZURE_ACR_NAME`. Pass the OIDC
+principal object ID as `postgresSchedulerPrincipalId` to grant only server
+read/start/stop actions. The schedule can be manually dispatched to start or
+stop the server.
+
+The staging image-publishing workflow only builds and pushes images; it does
+not deploy the application runtime. The Basic registry was deployed separately
+to `rg-labforge-core` as `labforgeregistry`; these commands reproduce that
+deployment after reviewing its what-if and cost:
+
+```powershell
+az deployment group what-if --name labforge-registry-preview --resource-group rg-labforge-core --template-file infra/registry.bicep --parameters registryName=labforgeregistry publisherPrincipalId=<staging-service-principal-object-id>
+az deployment group create --name labforge-registry --resource-group rg-labforge-core --template-file infra/registry.bicep --parameters registryName=labforgeregistry publisherPrincipalId=<staging-service-principal-object-id>
+```
+
+The template creates a Basic SKU registry with the admin account disabled and
+grants the staging GitHub service principal the built-in `AcrPush` role scoped
+to that registry. Registry repositories remain private and require
+authentication, but the registry endpoint is public-network reachable; use
+Premium and private networking if network isolation is required. Add
+`AZURE_ACR_NAME=labforgeregistry` as a variable in the GitHub `staging`
+environment. The registry name must be globally unique; check availability
+before creating it in another subscription.
 
 See [STAGING_ACCEPTANCE.md](./STAGING_ACCEPTANCE.md) for staging preflight,
-acceptance, and cleanup steps. These changes have not been deployed.
+acceptance, and cleanup steps. The registry is deployed; the root foundation
+and governance changes described above have not been deployed as part of this
+staging run.
 
 The PostgreSQL password is read from the environment, not stored in the
 parameter file. In PowerShell, set it for the current process and deploy:

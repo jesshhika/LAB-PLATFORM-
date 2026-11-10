@@ -52,7 +52,7 @@ jobs:
       - uses: azure/bicep-install@v1
       - run: bicep build infra/main.bicep
 
-  deploy-staging:
+  publish-staging-images:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ubuntu-latest
@@ -61,6 +61,7 @@ jobs:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
     steps:
       - uses: actions/checkout@v4
       - uses: azure/login@v2
@@ -68,18 +69,31 @@ jobs:
           client-id: ${{ env.AZURE_CLIENT_ID }}
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-      - run: az acr login --name labforgeregistry
-      - run: |
-          docker build -t labforgeregistry.azurecr.io/labforge-api:${{ github.sha }} -f api/Dockerfile .
-          docker build -t labforgeregistry.azurecr.io/labforge-web:${{ github.sha }} -f web/Dockerfile ./web
-          docker build -t labforgeregistry.azurecr.io/labforge-guac:${{ github.sha }} -f guac-proxy/Dockerfile ./guac-proxy
-          docker push labforgeregistry.azurecr.io/labforge-api:${{ github.sha }}
-          docker push labforgeregistry.azurecr.io/labforge-web:${{ github.sha }}
-          docker push labforgeregistry.azurecr.io/labforge-guac:${{ github.sha }}
+      - name: Validate registry configuration
+        shell: bash
+        run: |
+          if [[ ! "$AZURE_ACR_NAME" =~ ^[a-z0-9]{5,50}$ ]]; then
+            echo "Set staging environment variable AZURE_ACR_NAME to the deployed registry name." >&2
+            exit 1
+          fi
+      - name: Sign in to Azure Container Registry
+        run: az acr login --name "$AZURE_ACR_NAME"
+      - name: Build and publish staging images
+        env:
+          AZURE_ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          REGISTRY_LOGIN_SERVER="$AZURE_ACR_NAME.azurecr.io"
+          docker build -t "$REGISTRY_LOGIN_SERVER/labforge-api:$IMAGE_TAG" -f api/Dockerfile .
+          docker build -t "$REGISTRY_LOGIN_SERVER/labforge-web:$IMAGE_TAG" -f web/Dockerfile ./web
+          docker build -t "$REGISTRY_LOGIN_SERVER/labforge-guac:$IMAGE_TAG" -f guac-proxy/Dockerfile ./guac-proxy
+          docker push "$REGISTRY_LOGIN_SERVER/labforge-api:$IMAGE_TAG"
+          docker push "$REGISTRY_LOGIN_SERVER/labforge-web:$IMAGE_TAG"
+          docker push "$REGISTRY_LOGIN_SERVER/labforge-guac:$IMAGE_TAG"
 
   deploy-production:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: deploy-staging
+    needs: publish-staging-images
     runs-on: ubuntu-latest
     environment: production
     steps:
