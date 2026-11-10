@@ -59,8 +59,11 @@ deployed; application deployment and the billable acceptance VM have not.
 6. Completed: reviewed the registry what-if and deployed
    `infra/registry.bicep`. Verified `labforgeregistry.azurecr.io` uses Basic,
    has the admin account disabled, and grants the GitHub staging principal
-   only registry-scoped `AcrPush`. Set `AZURE_ACR_NAME=labforgeregistry` in the
-   GitHub `staging` environment before the image-publishing workflow runs.
+   only registry-scoped `AcrPush`. Set
+   `AZURE_ACR_NAME=labforgeregistry` in the GitHub `staging` environment.
+   The CI workflow passed on 10 November 2026 and published `labforge-api`,
+   `labforge-web`, and `labforge-guac` tagged
+   `e1e5df125dd6f406f91faa8bafc7523f8a1ba354`.
 7. Review the current worktree and Bicep what-if output. The 10 November
    what-if showed new budget, policies, policy assignments, a custom role, and
    role assignments; it also showed changes to the existing gallery description,
@@ -117,9 +120,10 @@ deployed; application deployment and the billable acceptance VM have not.
 ## Current status
 
 The application controls, reaper, Bicep guardrails, and scheduled PostgreSQL
-workflow are code changes. The Basic ACR was deployed after a successful
-what-if; the budget assignment and application runtime are not deployed, and no
-workflow run or billable acceptance VM has been performed. Configure the
-`AZURE_ACR_NAME` staging environment variable before image publishing. The
-Azure MCP PostgreSQL operation remains blocked by a credential tenant
-mismatch; Azure CLI read-only checks are available.
+workflow are code changes. The Basic ACR is deployed, and the staging CI
+workflow successfully published all three application images on 10 November
+2026. The budget assignment and application runtime are not deployed, and no
+billable acceptance VM has been performed. Azure CLI read-only checks confirm
+there are no Container Apps environments, applications, or jobs in the
+subscription. The Azure MCP PostgreSQL operation remains blocked by a
+credential tenant mismatch; Azure CLI read-only checks are available.
